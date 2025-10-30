@@ -1,0 +1,301 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Caça-Palavras - Compliance</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #001f3f;
+      background-image: url('check-removebg-preview.png');
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 200px;
+      color: #fff;
+    }
+    h1 { color: #f1f1f1; }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(15, 40px);
+      grid-gap: 2px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+    .cell {
+      width: 40px;
+      height: 40px;
+      background-color: rgba(255, 255, 255, 0.5);
+      border: 1px solid #ccc;
+      line-height: 40px;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+      color: #000;
+      font-weight: bold;
+    }
+    .selected { background-color: #3498db; color: #fff; }
+    .found { background-color: #2ecc71; color: #fff; }
+    #word-list { margin-top: 20px; }
+    #word-list li.found-word {
+      text-decoration: line-through;
+      color: #2ecc71;
+      font-weight: bold;
+    }
+    #selected-word { margin-top: 10px; font-weight: bold; }
+    #controls {
+      margin-top: 15px;
+    }
+    #controls button {
+      padding: 8px 15px;
+      font-size: 16px;
+      margin: 5px;
+      background: #fff;
+      color: #3498db;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #congrats {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 28px;
+      font-weight: bold;
+      color: #fff;
+      background: rgba(46, 204, 113, 0.95);
+      padding: 20px 40px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+      z-index: 9999;
+      text-align: center;
+    }
+    #congrats button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 18px;
+      background: #fff;
+      color: #2ecc71;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Caça-Palavras - Compliance</h1>
+  <div id="grid"></div>
+  <div id="selected-word">Palavra selecionada: <span id="current-word"></span></div>
+  <div id="controls">
+    <button onclick="clearSelection()">Limpar Seleção</button>
+    <button onclick="confirmWord()">Confirmar Palavra</button>
+  </div>
+  <div id="word-list">
+    <h3>Palavras para encontrar:</h3>
+    <ul id="words"></ul>
+  </div>
+  <div id="congrats">
+    🎉 Parabéns! Você encontrou todas as palavras! 🎉<br>
+    <button onclick="restartGame()">Reiniciar Jogo</button>
+  </div>
+
+  <script>
+    const words = [
+      "ÉTICA", "INTEGRIDADE", "TRANSPARÊNCIA", "GOVERNANÇA", "AUDITORIA",
+      "CÓDIGO", "CONDUTA", "RISCO", "POLÍTICA", "CONTROLE",
+      "FRAUDE", "REGULAMENTO", "CONFORMIDADE", "LEI", "NORMAS"
+    ];
+
+    const gridSize = 15;
+    let gridArray;
+    const directions = [
+      [0, 1], [1, 0], [1, 1], [0, -1], [-1, 0], [-1, -1], [1, -1], [-1, 1]
+    ];
+
+    let selectedCells = [];
+    let foundWords = [];
+    let firstClick = null;
+
+    function generateGrid() {
+      gridArray = Array(gridSize).fill().map(() => Array(gridSize).fill(""));
+      for (const word of words) {
+        if (!placeWordNoOverlap(word)) return false;
+      }
+      return true;
+    }
+
+    function placeWordNoOverlap(word) {
+      for (let attempt = 0; attempt < 1000; attempt++) {
+        const dir = directions[Math.floor(Math.random() * directions.length)];
+        const row = Math.floor(Math.random() * gridSize);
+        const col = Math.floor(Math.random() * gridSize);
+        if (canPlaceNoOverlap(word, row, col, dir)) {
+          for (let i = 0; i < word.length; i++) {
+            const r = row + i * dir[0];
+            const c = col + i * dir[1];
+            gridArray[r][c] = word[i];
+          }
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function canPlaceNoOverlap(word, row, col, dir) {
+      const [dr, dc] = dir;
+      for (let i = 0; i < word.length; i++) {
+        const r = row + i * dr;
+        const c = col + i * dc;
+        if (r < 0 || r >= gridSize || c < 0 || c >= gridSize) return false;
+        if (gridArray[r][c] !== "") return false;
+      }
+      return true;
+    }
+
+    function initGame() {
+      while (!generateGrid()) {}
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      for (let r = 0; r < gridSize; r++) {
+        for (let c = 0; c < gridSize; c++) {
+          if (gridArray[r][c] === "") {
+            gridArray[r][c] = alphabet[Math.floor(Math.random() * alphabet.length)];
+          }
+        }
+      }
+      renderGrid();
+      renderWordList();
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      for (let r = 0; r < gridSize; r++) {
+        for (let c = 0; c < gridSize; c++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.textContent = gridArray[r][c];
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.addEventListener("click", () => handleCellClick(cell));
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function renderWordList() {
+      const wordList = document.getElementById("words");
+      wordList.innerHTML = "";
+      words.forEach(word => {
+        const li = document.createElement("li");
+        li.textContent = word;
+        li.id = `word-${word}`;
+        wordList.appendChild(li);
+      });
+    }
+
+    function handleCellClick(cell) {
+      if (cell.classList.contains("found")) return;
+
+      if (!firstClick) {
+        clearSelection();
+        cell.classList.add("selected");
+        selectedCells = [cell];
+        firstClick = cell;
+      } else {
+        const secondClick = cell;
+        const path = getPathBetweenCells(firstClick, secondClick);
+        if (!path) {
+          alert("Seleção inválida. As letras devem estar em linha reta e contínuas.");
+          clearSelection();
+          return;
+        }
+        clearSelection();
+        selectedCells = path;
+        selectedCells.forEach(c => c.classList.add("selected"));
+        document.getElementById("current-word").textContent = selectedCells.map(c => c.textContent).join("");
+        firstClick = null;
+      }
+    }
+
+    function getPathBetweenCells(start, end) {
+      const r1 = parseInt(start.dataset.row);
+      const c1 = parseInt(start.dataset.col);
+      const r2 = parseInt(end.dataset.row);
+      const c2 = parseInt(end.dataset.col);
+
+      const dr = r2 - r1;
+      const dc = c2 - c1;
+
+      const len = Math.max(Math.abs(dr), Math.abs(dc)) + 1;
+      const stepR = Math.sign(dr);
+      const stepC = Math.sign(dc);
+
+      if (!(stepR === 0 || stepC === 0 || Math.abs(stepR) === Math.abs(stepC))) return null;
+
+      const path = [];
+      for (let i = 0; i < len; i++) {
+        const r = r1 + i * stepR;
+        const c = c1 + i * stepC;
+        const cell = [...document.querySelectorAll(".cell")].find(el =>
+          parseInt(el.dataset.row) === r && parseInt(el.dataset.col) === c
+        );
+        if (!cell || cell.classList.contains("found")) return null;
+        path.push(cell);
+      }
+      return path;
+    }
+
+    function confirmWord() {
+      if (selectedCells.length < 2) return alert("Selecione pelo menos duas letras.");
+      const wordFormed = selectedCells.map(c => c.textContent).join("");
+      const reversedWord = wordFormed.split("").reverse().join("");
+
+      const match = words.find(w => normalize(w) === normalize(wordFormed) || normalize(w) === normalize(reversedWord));
+
+      if (match && normalize(match).length === normalize(wordFormed).length) {
+        if (!foundWords.includes(match)) {
+          selectedCells.forEach(c => {
+            c.classList.remove("selected");
+            c.classList.add("found");
+          });
+          document.getElementById(`word-${match}`).classList.add("found-word");
+          foundWords.push(match);
+        }
+        selectedCells = [];
+        document.getElementById("current-word").textContent = "";
+
+        if (foundWords.length === words.length) {
+          document.getElementById("congrats").style.display = "block";
+        }
+      } else {
+        alert(`"${wordFormed}" não está na lista ou está incompleta.`);
+      }
+    }
+
+    function normalize(str) {
+      return str.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+    }
+
+    function clearSelection() {
+      selectedCells.forEach(c => c.classList.remove("selected"));
+      selectedCells = [];
+      document.getElementById("current-word").textContent = "";
+      firstClick = null;
+    }
+
+    function restartGame() {
+      foundWords = [];
+      selectedCells = [];
+      document.getElementById("congrats").style.display = "none";
+      initGame();
+    }
+
+    initGame();
+  </script>
+</body>
+</html>
